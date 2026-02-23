@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Rizo Fitness Dashboard</title>
+  <style>
+    body {
+      font-family: Arial;
+      background: #121212;
+      color: #f1f1f1;
+      margin: 40px;
+    }
+
+    .box {
+      background: #1e1e1e;
+      padding: 20px;
+      margin-top: 20px;
+      border-radius: 12px;
+    }
+
+    input, select, button {
+      padding: 8px;
+      margin: 5px;
+      border-radius: 6px;
+      border: none;
+    }
+
+    input, select {
+      background: #2a2a2a;
+      color: white;
+    }
+
+    button {
+      background: #00c853;
+      color: white;
+      font-weight: bold;
+      cursor: pointer;
+    }
+
+    button:hover {
+      background: #00e676;
+    }
+
+    table {
+      width: 100%;
+      margin-top: 10px;
+      border-collapse: collapse;
+    }
+
+    th, td {
+      border: 1px solid #333;
+      padding: 8px;
+      text-align: center;
+    }
+
+    th {
+      background: #2a2a2a;
+    }
+
+    .success { color: #00e676; font-weight: bold; }
+    .warning { color: #ff5252; font-weight: bold; }
+  </style>
+</head>
+<body>
+
+<h1>🏃 Rizo Fitness Dashboard</h1>
+
+<div class="box">
+  <h2>Log a Run</h2>
+  <input type="date" id="date">
+  <input type="number" id="distance" placeholder="Distance (km)">
+  <input type="number" id="time" placeholder="Time (minutes)">
+  <select id="type">
+    <option value="normal">Normal Run</option>
+    <option value="lsd">LSD</option>
+  </select>
+  <button onclick="addRun()">Add Run</button>
+  <p id="lsdStatus"></p>
+</div>
+
+<div class="box">
+  <h2>Your Runs</h2>
+  <table id="runsTable">
+    <tr>
+      <th>Date</th>
+      <th>Distance</th>
+      <th>Time</th>
+      <th>Speed</th>
+      <th>Type</th>
+    </tr>
+  </table>
+</div>
+
+<!-- FIREBASE -->
+<script type="module">
+
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { getFirestore, collection, addDoc, getDocs } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+/* 🔥 PASTE YOUR FIREBASE CONFIG HERE */
+const firebaseConfig = {
+  apiKey: "PASTE_HERE",
+  authDomain: "PASTE_HERE",
+  projectId: "PASTE_HERE",
+  storageBucket: "PASTE_HERE",
+  messagingSenderId: "PASTE_HERE",
+  appId: "PASTE_HERE"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+
+const table = document.getElementById("runsTable");
+const lsdStatus = document.getElementById("lsdStatus");
+
+function getWeekNumber() {
+  const d = new Date();
+  d.setHours(0,0,0,0);
+  d.setDate(d.getDate() + 4 - (d.getDay()||7));
+  const yearStart = new Date(d.getFullYear(),0,1);
+  return Math.ceil((((d - yearStart)/86400000)+1)/7);
+}
+
+function checkWeeklyReset() {
+  const currentWeek = getWeekNumber();
+  const savedWeek = localStorage.getItem("weekNumber");
+  if(savedWeek != currentWeek){
+    localStorage.setItem("weekNumber", currentWeek);
+    localStorage.setItem("lsdDone", "false");
+  }
+}
+
+function updateLSDStatus() {
+  if(localStorage.getItem("lsdDone") === "true"){
+    lsdStatus.innerHTML = "<span class='success'>✅ LSD Completed This Week</span>";
+  } else {
+    lsdStatus.innerHTML = "<span class='warning'>⚠ LSD Not Yet Completed</span>";
+  }
+}
+
+window.addRun = async function() {
+  const date = document.getElementById("date").value;
+  const distance = parseFloat(document.getElementById("distance").value);
+  const time = parseFloat(document.getElementById("time").value);
+  const type = document.getElementById("type").value;
+
+  if(!date || !distance || !time){
+    alert("Fill in all fields");
+    return;
+  }
+
+  const speed = (distance / (time / 60)).toFixed(2);
+
+  if(type === "lsd"){
+    localStorage.setItem("lsdDone", "true");
+  }
+
+  await addDoc(collection(db, "runs"), {
+    date, distance, time, speed, type
+  });
+
+  alert("Run saved! Do your push-ups now 💪🔥");
+  loadRuns();
+  updateLSDStatus();
+}
+
+async function loadRuns(){
+  const snapshot = await getDocs(collection(db, "runs"));
+  table.innerHTML = `
+    <tr>
+      <th>Date</th>
+      <th>Distance</th>
+      <th>Time</th>
+      <th>Speed</th>
+      <th>Type</th>
+    </tr>
+  `;
+
+  snapshot.forEach(doc => {
+    const r = doc.data();
+    table.innerHTML += `
+      <tr>
+        <td>${r.date}</td>
+        <td>${r.distance} km</td>
+        <td>${r.time} min</td>
+        <td>${r.speed} km/h</td>
+        <td>${r.type === "lsd" ? "🟢 LSD" : "Normal"}</td>
+      </tr>
+    `;
+  });
+}
+
+checkWeeklyReset();
+updateLSDStatus();
+loadRuns();
+
+</script>
+
+</body>
+</html>
